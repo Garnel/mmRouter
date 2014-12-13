@@ -34,7 +34,7 @@ define(["mmHistory"], function() {
         },
         _pathToRegExp: function(pattern, opts) {
             var keys = opts.keys = [],
-              //      segments = opts.segments = [],
+                    //      segments = opts.segments = [],
                     compiled = '^', last = 0, m, name, regexp, segment;
 
             while ((m = placeholder.exec(pattern))) {
@@ -51,13 +51,14 @@ define(["mmHistory"], function() {
                 }
                 keys.push(key)
                 compiled += quoteRegExp(segment, regexp, false)
-              //  segments.push(segment)
+                //  segments.push(segment)
                 last = placeholder.lastIndex
             }
             segment = pattern.substring(last);
             compiled += quoteRegExp(segment) + (opts.strict ? opts.last : "\/?") + '$';
-          //  segments.push(segment);
-            opts.regexp = new RegExp(compiled, opts.caseInsensitive ? 'i' : undefined);
+            var sensitive = typeof opts.caseInsensitive === "boolean" ? opts.caseInsensitive : true
+            //  segments.push(segment);
+            opts.regexp = new RegExp(compiled, sensitive ? 'i' : undefined);
             return opts
 
         },
@@ -122,6 +123,9 @@ define(["mmHistory"], function() {
         },
         navigate: function(hash) {
             var parsed = parseQuery(hash)
+            if(hash.charAt(0) === "/")
+                hash = hash.slice(1)// 修正出现多扛的情况 fix http://localhost:8383/mmRouter/index.html#!//
+            avalon.history.updateLocation(hash)
             this.route("get", parsed.path, parsed.query)
         },
         /* *
@@ -148,7 +152,7 @@ define(["mmHistory"], function() {
                 }
             },
             string: {
-                pattern: "[^\/]*"
+                pattern: "[^\\/]*"
             },
             bool: {
                 decode: function(val) {
@@ -160,7 +164,7 @@ define(["mmHistory"], function() {
                 decode: function(val) {
                     return parseInt(val, 10);
                 },
-                pattern: "\d+"
+                pattern: "\\d+"
             }
         }
     }
@@ -180,9 +184,11 @@ define(["mmHistory"], function() {
     }
     function supportLocalStorage() {
         try {
-            return 'localStorage' in window && window['localStorage'] !== null;
+            localStorage.setItem("avalon", 1)
+            localStorage.removeItem("avalon")
+            return true
         } catch (e) {
-            return false;
+            return false
         }
     }
 

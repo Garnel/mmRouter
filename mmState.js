@@ -1,4 +1,4 @@
-define("mmState", ["mmRouter"], function() {
+define("mmState", ["mmPromise", "mmRouter"], function() {
 //重写mmRouter中的route方法     
     avalon.router.route = function(method, path, query) {
         path = path.trim()
@@ -49,8 +49,10 @@ define("mmState", ["mmRouter"], function() {
     }
 
     var mmState = {
+        prevState: null,
         currentState: null,
         transitionTo: function(fromState, toState, args) {
+            mmState.prevState = fromState
             mmState.currentState = toState
             var states = []
             var t = toState
@@ -124,7 +126,7 @@ define("mmState", ["mmRouter"], function() {
      * onChange: 当切换为当前状态时调用的回调，this指向状态对象，参数为匹配的参数，
      *           我们可以在此方法 定义此模板用到的VM， 或修改VM的属性
      * onBeforeLoad: 模板还没有插入DOM树执行的回调，this指向[ms-view]元素节点，参数为状态对象
-     * onAfterLoad: 模板还没有插入DOM树执行的回调，this指向[ms-view]元素节点，参数为状态对象
+     * onAfterLoad: 模板插入DOM树执行的回调，this指向[ms-view]元素节点，参数为状态对象
      * abstract:  表示它不参与匹配
      * parentState: 父状态对象（框架内部生成）
      */
@@ -154,7 +156,13 @@ define("mmState", ["mmRouter"], function() {
             var promises = []
             getFn(opts, "onChange").apply(that, args)
             var vmodes = getVModels(opts)
-            var topCtrlName = vmodes[vmodes.length - 1].$id
+            var topCtrlName = vmodes[vmodes.length - 1]
+            if (!topCtrlName) {
+                avalon.log("topController不存在")
+                return
+            }
+            topCtrlName = topCtrlName.$id
+            var prevState = mmState.prevState && (mmState.prevState.stateName +'.')
             avalon.each(opts.views, function(keyname, view) {
                 if (keyname.indexOf("@") >= 0) {
                     var match = keyname.split("@")
@@ -164,24 +172,25 @@ define("mmState", ["mmRouter"], function() {
                     viewname = keyname || ""
                     statename = stateName
                 }
-                var nodes = getViews(topCtrlName, statename)
-                var node = getNamedView(nodes, viewname)
-                var warnings = "warning: " + stateName + "状态对象的【" + keyname + "】视图对象"
-                if (node) {
-                    var promise = fromPromise(view, that.params)
-                    getFn(view, "onBeforeLoad").call(node, that)
-                    promise.then(function(s) {
-                        avalon.innerHTML(node, s)
-                        getFn(view, "onAfterLoad").call(node, that)
-                        avalon.scan(node, vmodes)
-                    }, function(msg) {
-                        avalon.log(warnings + " " + msg)
-
-                    })
-                    promises.push(promise)
-                } else {
-                    avalon.log(warnings + "对应的元素节点不存在")
-                }
+                if(!prevState || prevState.indexOf(stateName + '.') !== 0) {
+                    var nodes = getViews(topCtrlName, statename)
+                    var node = getNamedView(nodes, viewname)
+                    var warnings = "warning: " + stateName + "状态对象的【" + keyname + "】视图对象" //+ viewname
+                    if (node) {
+                        var promise = fromPromise(view, that.params)
+                        getFn(opts, "onBeforeLoad").call(node, that)
+                        promise.then(function(s) {
+                            avalon.innerHTML(node, s)
+                            getFn(opts, "onAfterLoad").call(node, that)
+                            avalon.scan(node, vmodes)
+                        }, function(msg) {
+                            avalon.log(warnings + " " + msg)
+                        })
+                        promises.push(promise)
+                    } else {
+                        avalon.log(warnings + "对应的元素节点不存在")
+                    }
+                }    
             })
 
             return Promise.all(promises)
@@ -205,6 +214,7 @@ define("mmState", ["mmRouter"], function() {
         if (document.querySelectorAll) {
             return document.querySelectorAll(firstExpr + " " + otherExpr.join(" "))
         } else {
+            //DIV[avalonctrl="test"] [ms-view] 从右到左查找，先找到所有匹配[ms-view]的元素
             var seeds = Array.prototype.filter.call(document.getElementsByTagName("*"), function(node) {
                 return typeof node.getAttribute("ms-view") === "string"
             })
@@ -214,8 +224,10 @@ define("mmState", ["mmRouter"], function() {
                     return typeof node.getAttribute("ms-view") === "string"
                 })
             }
+            //判定这些候先节点是否匹配[avalonctrl="test"]或[ms-controller="test"]
             seeds = matchSelectors(seeds, function(node) {
-                return typeof node.getAttribute("ms-controller") === ctrl
+                return  node.getAttribute("avalonctrl") === ctrl ||
+                        node.getAttribute("ms-controller") === ctrl
             })
             return seeds.map(function(el) {
                 return el.node
@@ -241,13 +253,15 @@ define("mmState", ["mmRouter"], function() {
     }
     // 【matchSelectors】的辅助函数，判定array[i]及其祖先是否匹配match回调
     function matchSelector(i, array, match) {
-        var parent = array[i]
-        var node = parent
-        if (parent.node) {
-            parent = parent.parent
-            node = parent.node
+        var elem = array[i]
+        if (elem.node) {
+            var node = elem.node
+            var parent = elem.parent
+        } else {
+            node = elem
+            parent = elem.parentNode
         }
-        while (parent) {
+        while (parent && parent.nodeType !== 9) {
             if (match(parent)) {
                 return array[i] = {
                     node: node,
@@ -258,7 +272,6 @@ define("mmState", ["mmRouter"], function() {
         }
         array[i] = false
     }
-
     // 【avalon.state】的辅助函数，opts.template的处理函数
     function fromString(template, params) {
         var promise = new Promise(function(resolve, reject) {

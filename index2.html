@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>mmState的相关测试</title>
-        <meta charset="UTF-8">
+        <meta charset="utf-8">
         <meta name="viewport" content="width=device-width">
+        <meta http-equiv="X-UA-Compatible" content="IE=6" />
+        <title>mmState的相关测试</title>
         <style>
             .header{
                 background-color: #ccc;
@@ -26,13 +27,12 @@
                 right: 40px;
             }
         </style>
-        <script src="avalon.js">
-
-        </script>
-        <script>
-            avalon.config({debug: false})
+        <script src="avalon.js"></script>
+        <script >
+            avalon.config({debug: true})
             require(["ready!", "mmState"], function() {
-                //一个顶级VM
+
+                //一个顶层VM
                 avalon.define({
                     $id: "test"
                 })
@@ -201,6 +201,12 @@
                 avalon.state("contacts.list", {
                     controller: "contacts",
                     url: "",
+                    onBeforeLoad: function() {
+                        avalon.log("contacts.list:onBeforeLoad")
+                    },
+                    onAfterLoad: function() {
+                        avalon.log("contacts.list:onAfterLoad")
+                    },
                     views: {
                         "": {
                             templateUrl: "contacts.list.html"
@@ -221,7 +227,7 @@
                     },
                     views: {
                         "": {
-                            templateUrl: "contacts.detail.html",
+                            templateUrl: "contacts.detail.html"
                         },
                         'hint@': {
                             template: "当前状态是contacts.detail"
@@ -252,7 +258,7 @@
                     },
                     views: {
                         "": {
-                            templateUrl: "contacts.detail.item.html",
+                            templateUrl: "contacts.detail.item.html"
                         },
                         'hint@': {
                             template: "当前状态是contacts.detail.item"
@@ -287,7 +293,9 @@
     </head>
 
     <body>
+        <h1>mmState例子</h1>
         <div ms-controller="test">
+
             <div class="header">
                 <a href="#!/">mmState</a>  <a href="#!/contacts">contacts</a>  <a href="#!/about">about</a>
                 <p class="hint" ms-view="hint"></p>

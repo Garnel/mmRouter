@@ -171,7 +171,6 @@ define(["avalon"], function(avalon) {
                     break;
             }
             //根据当前的location立即进入不同的路由回调
-
             this.fireRouteChange(this.fragment || "/")
 
         },
@@ -224,6 +223,9 @@ define(["avalon"], function(avalon) {
         if (targetIsThisWindow(target.target)) {
             var href = oldIE ? target.getAttribute("href", 2) : target.getAttribute("href") || target.getAttribute("xlink:href")
             var prefix = avalon.history.prefix
+            if (href === null) { // href is null if the attribute is not present
+                return
+            }
             var hash = href.replace(prefix, "").trim()
             if (href.indexOf(prefix) === 0 && hash !== "") {
                 event.preventDefault()
